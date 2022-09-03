@@ -1,27 +1,39 @@
-import {loadStdlib} from '@reach-sh/stdlib';
+// import and initialize the Reach standard library
+import { loadStdlib, test } from '@reach-sh/stdlib';
 import * as backend from './build/index.main.mjs';
-const stdlib = loadStdlib(process.env);
+// Basics
+const stdlib = loadStdlib();
+const err = {
+  // different error messages for different connectors
+  'ETH': 'transaction may fail',
+  'ALGO': 'assert failed',
+  'CFX': 'transaction is reverted',
+}[stdlib.connector];
 
-const startingBalance = stdlib.parseCurrency(100);
+// defining the make RSVP function
+const makeRSVP = async ({ hostLabel, name, reservation, timeLimit }) => {
+  const sbal = stdlib.parseCurrency(100);
+  // create a new host account and fund the account
+  const accHost = await stdlib.newTestAccount(sbal);
+  // setting a label for debugging purposes
+  accHost.setDebugLabel(hostLabel);
 
-const [ accAlice, accBob ] =
-  await stdlib.newTestAccounts(2, startingBalance);
-console.log('Hello, Alice and Bob!');
+// this function takes an object with an account field
+// adds a Person.getBalance function
+// returns the account's current balance as a formatted string
+const stdPerson = (obj) => {
+  const { acc } = obj;
+  const getBalance = async () => {
+    const bal = await acc.balanceOf();
+    return `${stdlib.formatCurrency(bal, 4)} ${stdlib.standardUnit}`;
+  };
+  return {
+    ...obj,
+    getBalance,
+  };
+};
 
-console.log('Launching...');
-const ctcAlice = accAlice.contract(backend);
-const ctcBob = accBob.contract(backend, ctcAlice.getInfo());
-
-console.log('Starting backends...');
-await Promise.all([
-  backend.Alice(ctcAlice, {
-    ...stdlib.hasRandom,
-    // implement Alice's interact object here
-  }),
-  backend.Bob(ctcBob, {
-    ...stdlib.hasRandom,
-    // implement Bob's interact object here
-  }),
-]);
-
-console.log('Goodbye, Alice and Bob!');
+const Host = stdPerson({
+  acc: accHost,
+  label: hostLabel,
+});
